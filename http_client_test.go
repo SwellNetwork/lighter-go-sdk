@@ -19,7 +19,7 @@ type HTTPClientIntegrationTestSuite struct {
 }
 
 func (ts *HTTPClientIntegrationTestSuite) SetupSuite() {
-	config := DefaultHTTPClientConfig()
+	config := DefaultTestnetHTTPClientConfig()
 
 	ts.client = NewHTTPClient(config)
 }
@@ -59,6 +59,22 @@ func (ts *HTTPClientIntegrationTestSuite) TestGetOrderBooks() {
 	result, err := ts.client.GetOrderBooks(ctx, nil)
 
 	ts.T().Log("get orderbooks", result)
+
+	ts.NoError(err)
+	ts.NotNil(result)
+}
+
+func (ts *HTTPClientIntegrationTestSuite) TestGetAccounts() {
+	ctx := context.Background()
+
+	params := &GetAccountsParams{
+		By:    GetAccountByL1Address,
+		Value: "",
+	}
+
+	result, err := ts.client.GetAccounts(ctx, params)
+
+	ts.T().Log("get accounts", result)
 
 	ts.NoError(err)
 	ts.NotNil(result)

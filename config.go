@@ -7,9 +7,16 @@ type HTTPClientConfig struct {
 	Timeout time.Duration
 }
 
-func DefaultHTTPClientConfig() HTTPClientConfig {
+func DefaultMainnetHTTPClientConfig() HTTPClientConfig {
 	return HTTPClientConfig{
 		BaseURL: "https://mainnet.zklighter.elliot.ai",
+		Timeout: 3 * time.Second,
+	}
+}
+
+func DefaultTestnetHTTPClientConfig() HTTPClientConfig {
+	return HTTPClientConfig{
+		BaseURL: "https://testnet.zklighter.elliot.ai",
 		Timeout: 3 * time.Second,
 	}
 }
