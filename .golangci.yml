@@ -1,0 +1,32 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - revive
+    - staticcheck
+  exclusions:
+    paths:
+      - ".*_test\\.go"
+  settings:
+    revive:
+      confidence: 0.8
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/SwellNetwork/lighter-go-sdk
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

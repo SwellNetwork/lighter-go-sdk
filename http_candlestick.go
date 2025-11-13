@@ -10,12 +10,6 @@ const (
 	PathGetFundings = "/api/v1/fundings"
 )
 
-type GetFundingsResult struct {
-	Code       int32     `json:"code"`
-	Resolution string    `json:"resolution"`
-	Fundings   []Funding `json:"fundings"`
-}
-
 func (c *HTTPClient) GetFundings(ctx context.Context, params *GetFundingsParams) ([]Funding, error) {
 	queryParams := map[string]string{
 		"market_id":       strconv.FormatInt(int64(params.MarketID), 10),

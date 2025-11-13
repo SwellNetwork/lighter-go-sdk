@@ -10,12 +10,6 @@ const (
 	PathOrderBooks = "/api/v1/orderBooks"
 )
 
-type GetOrderBooksResult struct {
-	Code       int32       `json:"code"`
-	Message    string      `json:"message"`
-	OrderBooks []OrderBook `json:"order_books"`
-}
-
 func (c *HTTPClient) GetOrderBooks(ctx context.Context, params *GetOrderBooksParams) ([]OrderBook, error) {
 	var queryParams map[string]string
 

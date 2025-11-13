@@ -1,0 +1,59 @@
+name: CI
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+env:
+  GO_VERSION: 1.24.5
+
+jobs:
+  ci:
+    name: ${{ matrix.job }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        job: [lint, test]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Lint
+        if: matrix.job == 'lint'
+        uses: golangci/golangci-lint-action@v8
+        with:
+          args: --timeout=5m
+
+      - name: Test
+        if: matrix.job == 'test'
+        env:
+          TESTCOVERAGE_THRESHOLD: 0
+        run: |
+          set -euo pipefail
+          echo "Running tests..."
+          go test -p 1 -v -coverpkg=./... -coverprofile=profile.cov ./... | tee test.log
+          go tool cover -func profile.cov
+
+          echo "------------------"
+          if grep -q "FAIL:" test.log; then
+            echo "--- SOME TESTCASES FAILED"
+          else
+            echo "--- ALL TESTCASES PASSED"
+          fi
+
+          echo "Threshold: ${TESTCOVERAGE_THRESHOLD}%"
+          totalCoverage=$(go tool cover -func=profile.cov | awk '/total:/ {print substr($3, 1, length($3)-1)}')
+          echo "Current test coverage: ${totalCoverage}%"
+          if awk -v total="$totalCoverage" -v threshold="$TESTCOVERAGE_THRESHOLD" 'BEGIN {exit !(total + 0 >= threshold + 0)}'; then
+            echo "OK"
+          else
+            echo "Current test coverage is below threshold. Please add more unit tests."
+            exit 1
+          fi

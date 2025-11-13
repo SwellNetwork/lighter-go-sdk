@@ -9,12 +9,6 @@ const (
 	PathGetFundingRates = "/api/v1/funding-rates"
 )
 
-type GetFundingRatesResult struct {
-	Code         int32          `json:"code"`
-	Message      string         `json:"message"`
-	FundingRates []FundingRates `json:"funding_rates"`
-}
-
 func (c *HTTPClient) GetFundingRates(ctx context.Context) ([]FundingRates, error) {
 	var result GetFundingRatesResult
 
