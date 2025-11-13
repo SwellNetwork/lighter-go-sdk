@@ -11,7 +11,7 @@ const (
 )
 
 func (c *HTTPClient) GetOrderBooks(ctx context.Context, params *GetOrderBooksParams) ([]OrderBook, error) {
-	var queryParams map[string]string
+	queryParams := map[string]string{}
 
 	if params != nil {
 		queryParams["market_id"] = strconv.FormatInt(int64(params.MarketID), 10)
