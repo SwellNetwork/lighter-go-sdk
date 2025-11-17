@@ -47,8 +47,8 @@ func (c *WSClient) subscribe(
 	s.addSubscriber(subscriberID, callback)
 
 	return &Subscription{
-		ID: subscriberID,
-		Close: func() {
+		id: subscriberID,
+		close: func() {
 			s.removeSubscriber(subscriberID)
 		},
 	}, nil
