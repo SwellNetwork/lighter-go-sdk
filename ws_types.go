@@ -10,6 +10,44 @@ import (
 type sharedSubscriptionFinder func(string) (*sharedSubscription, bool)
 type callback func(any)
 
+type wsErrorPayload struct {
+	Error *struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+type WSError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Channel string `json:"-"`
+}
+
+func (e WSError) Error() string {
+	if e.Channel != "" {
+		return fmt.Sprintf("websocket error (%s): %d %s", e.Channel, e.Code, e.Message)
+	}
+
+	return fmt.Sprintf("websocket error: %d %s", e.Code, e.Message)
+}
+
+func parseWSError(raw json.RawMessage, channel string) (*WSError, bool) {
+	var payload wsErrorPayload
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, false
+	}
+
+	if payload.Error == nil {
+		return nil, false
+	}
+
+	return &WSError{
+		Code:    payload.Error.Code,
+		Message: payload.Error.Message,
+		Channel: canonicalChannelName(channel),
+	}, true
+}
+
 func subscribeTyped[T any](
 	c *WSClient,
 	channel string,
@@ -22,6 +60,11 @@ func subscribeTyped[T any](
 	var zero T
 
 	return c.subscribe(channel, func(msg any) {
+		if err, ok := msg.(error); ok {
+			callback(zero, err)
+			return
+		}
+
 		typed, ok := msg.(T)
 		if !ok {
 			callback(zero, fmt.Errorf("invalid message type: %T", msg))

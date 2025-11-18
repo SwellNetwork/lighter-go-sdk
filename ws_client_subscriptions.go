@@ -1,6 +1,7 @@
 package lighter
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -36,6 +37,11 @@ func (c *WSClient) subscribe(
 					c.logger.Errorf("failed to unsubscribe: %v", err)
 				}
 			},
+			subscriptionRetryConfig{
+				maxAttempts: c.config.SubscribeRetryAttempts,
+				backoff:     c.subscribeRetryBackoffDuration,
+				shouldRetry: isRetriableSubscribeError,
+			},
 		)
 
 		c.sharedSubscriptionByChannel[lookupKey] = s
@@ -62,4 +68,13 @@ func (c *WSClient) resubscribeAll() error {
 	}
 
 	return nil
+}
+
+func isRetriableSubscribeError(err error) bool {
+	var wsErr *WSError
+	if !errors.As(err, &wsErr) {
+		return false
+	}
+
+	return wsErr.Code == 30009
 }

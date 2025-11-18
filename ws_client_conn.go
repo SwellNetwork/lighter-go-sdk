@@ -10,8 +10,10 @@ import (
 )
 
 const (
-	minReconnectBackoff = time.Second
-	maxReconnectBackoff = 30 * time.Second
+	minReconnectBackoff             = time.Second
+	maxReconnectBackoff             = 30 * time.Second
+	defaultSubscribeRetryMinBackoff = time.Second
+	defaultSubscribeRetryMaxBackoff = 30 * time.Second
 )
 
 func (c *WSClient) connect(ctx context.Context) error {
@@ -159,6 +161,12 @@ func (c *WSClient) reconnect(ctx context.Context) {
 }
 
 func (c *WSClient) dispatch(msg wsMessage) error {
+	if wsErr, ok := parseWSError(msg.Raw, msg.Channel); ok {
+		c.logger.Errorf("websocket error received: %v", wsErr)
+		c.dispatchError(msg.Channel, wsErr)
+		return nil
+	}
+
 	d, dispatcherFound := c.dispatcherByChannelType[getChannelType(msg.Channel)]
 	if !dispatcherFound {
 		return fmt.Errorf("no dispatcher for channel: %s", msg.Channel)
@@ -172,6 +180,32 @@ func (c *WSClient) dispatch(msg wsMessage) error {
 	}
 
 	return d(finder, msg)
+}
+
+func (c *WSClient) dispatchError(channel string, err error) {
+	if channel == "" {
+		c.mu.RLock()
+		subs := make([]*sharedSubscription, 0, len(c.sharedSubscriptionByChannel))
+		for _, s := range c.sharedSubscriptionByChannel {
+			subs = append(subs, s)
+		}
+		c.mu.RUnlock()
+
+		for _, s := range subs {
+			s.dispatchError(err)
+		}
+		return
+	}
+
+	lookup := canonicalChannelName(channel)
+
+	c.mu.RLock()
+	s, ok := c.sharedSubscriptionByChannel[lookup]
+	c.mu.RUnlock()
+
+	if ok && s != nil {
+		s.dispatchError(err)
+	}
 }
 
 func (c *WSClient) writeJSON(v any) error {
@@ -229,4 +263,27 @@ func (c *WSClient) reconnectBackoffDuration(attempt int) time.Duration {
 	}
 
 	return min(minReconnectBackoff<<(attempt-1), maxReconnectBackoff)
+}
+
+func (c *WSClient) subscribeRetryBackoffDuration(attempt int) time.Duration {
+	minBackoff := c.config.SubscribeRetryMinBackoff
+	if minBackoff <= 0 {
+		minBackoff = defaultSubscribeRetryMinBackoff
+	}
+
+	maxBackoff := c.config.SubscribeRetryMaxBackoff
+	if maxBackoff <= 0 {
+		maxBackoff = defaultSubscribeRetryMaxBackoff
+	}
+
+	if attempt <= 0 {
+		return minBackoff
+	}
+
+	backoff := minBackoff << (attempt - 1)
+	if backoff > maxBackoff {
+		backoff = maxBackoff
+	}
+
+	return backoff
 }
