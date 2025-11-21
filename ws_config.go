@@ -5,6 +5,7 @@ import "time"
 type WSClientConfig struct {
 	BaseURL                  string
 	PingInterval             time.Duration
+	ReadTimeout              time.Duration
 	ReconnectAttempts        int
 	AuthToken                string
 	SubscribeRetryAttempts   int

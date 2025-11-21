@@ -62,6 +62,15 @@ func (c *WSClient) connect(ctx context.Context) error {
 func (c *WSClient) messageLoop(ctx context.Context, conn *websocket.Conn) {
 	defer c.clearConnection(conn)
 
+	readTimeout := c.config.ReadTimeout
+	if readTimeout <= 0 {
+		if c.config.PingInterval > 0 {
+			readTimeout = c.config.PingInterval * 2
+		} else {
+			readTimeout = 0
+		}
+	}
+
 	for {
 		select {
 		case <-c.done:
@@ -69,6 +78,13 @@ func (c *WSClient) messageLoop(ctx context.Context, conn *websocket.Conn) {
 		case <-ctx.Done():
 			return
 		default:
+			if readTimeout > 0 {
+				if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
+					c.logger.Errorf("failed to set websocket read deadline: %v", err)
+					c.triggerReconnect()
+					return
+				}
+			}
 			_, msg, err := conn.ReadMessage()
 			if err != nil {
 				if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {

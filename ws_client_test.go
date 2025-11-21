@@ -29,11 +29,8 @@ func (ts *WSClientIntegrationTestSuite) SetupTest() {
 }
 
 func (ts *WSClientIntegrationTestSuite) TestMarketStats() {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	ts.T().Log("Connecting to websocket")
-	if err := ts.client.Connect(ctx); err != nil {
+	if err := ts.client.Connect(context.Background()); err != nil {
 		ts.T().Fatalf("Failed to connect: %v", err)
 	}
 	defer ts.client.Close()
@@ -44,7 +41,7 @@ func (ts *WSClientIntegrationTestSuite) TestMarketStats() {
 			if err != nil {
 				ts.T().Fatalf("Failed to receive trades: %v", err)
 			}
-			ts.T().Logf("Received: %v", marketStats)
+			ts.T().Logf("Received: %v at %d", marketStats, time.Now().Unix())
 		},
 	)
 
@@ -56,7 +53,7 @@ func (ts *WSClientIntegrationTestSuite) TestMarketStats() {
 
 	defer sub.Close()
 
-	<-time.After(time.Second * 5)
+	<-time.After(time.Minute * 30)
 	ts.T().Log("Unsubscribing from market stats")
 	sub.Close()
 }
