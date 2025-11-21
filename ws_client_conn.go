@@ -104,6 +104,11 @@ func (c *WSClient) messageLoop(ctx context.Context, conn *websocket.Conn) {
 				continue
 			}
 
+			if wsMsg.Type == "pong" {
+				c.handlePongMessage()
+				continue
+			}
+
 			if err = c.dispatch(wsMsg); err != nil {
 				c.logger.Errorf("failed to dispatch websocket message: %v", err)
 			}
@@ -112,8 +117,13 @@ func (c *WSClient) messageLoop(ctx context.Context, conn *websocket.Conn) {
 }
 
 func (c *WSClient) heartbeatLoop(ctx context.Context) {
-	ticker := time.NewTicker(c.config.PingInterval)
-	defer ticker.Stop()
+	interval := c.config.PingInterval
+	if interval <= 0 {
+		return
+	}
+
+	timer := time.NewTimer(interval)
+	defer timer.Stop()
 
 	for {
 		select {
@@ -124,8 +134,20 @@ func (c *WSClient) heartbeatLoop(ctx context.Context) {
 		case <-c.reconnectCh:
 			c.reconnect(ctx)
 			return
-		case <-ticker.C:
+		case <-timer.C:
+			c.drainPendingPongs()
+
 			if err := c.writeJSON(wsCommandPing); err != nil {
+				c.reconnect(ctx)
+				return
+			}
+
+			switch c.waitForPong(ctx, interval) {
+			case pongWaitResultOK:
+				timer.Reset(interval)
+			case pongWaitResultClosed:
+				return
+			case pongWaitResultReconnect, pongWaitResultTimeout:
 				c.reconnect(ctx)
 				return
 			}
@@ -196,6 +218,55 @@ func (c *WSClient) dispatch(msg wsMessage) error {
 	}
 
 	return d(finder, msg)
+}
+
+func (c *WSClient) handlePongMessage() {
+	select {
+	case c.pongCh <- struct{}{}:
+	default:
+	}
+}
+
+func (c *WSClient) drainPendingPongs() {
+	for {
+		select {
+		case <-c.pongCh:
+		default:
+			return
+		}
+	}
+}
+
+type pongWaitResult int
+
+const (
+	pongWaitResultOK pongWaitResult = iota
+	pongWaitResultClosed
+	pongWaitResultReconnect
+	pongWaitResultTimeout
+)
+
+func (c *WSClient) waitForPong(ctx context.Context, timeout time.Duration) pongWaitResult {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-c.done:
+			return pongWaitResultClosed
+		case <-ctx.Done():
+			return pongWaitResultClosed
+		case <-c.reconnectCh:
+			return pongWaitResultReconnect
+		case <-timer.C:
+			c.logger.Errorf("did not receive pong within %s", timeout)
+			return pongWaitResultTimeout
+		case <-c.pongCh:
+			// drop any stale signals that may have been queued
+			c.drainPendingPongs()
+			return pongWaitResultOK
+		}
+	}
 }
 
 func (c *WSClient) dispatchError(channel string, err error) {

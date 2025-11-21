@@ -18,6 +18,7 @@ type WSClient struct {
 
 	done        chan struct{}
 	reconnectCh chan struct{}
+	pongCh      chan struct{}
 	mu          sync.RWMutex
 	writeMu     sync.Mutex
 	closeOnce   sync.Once
@@ -61,6 +62,7 @@ func NewWSClient(config WSClientConfig, opts ...WSClientOption) *WSClient {
 
 		done:        make(chan struct{}),
 		reconnectCh: make(chan struct{}, 1),
+		pongCh:      make(chan struct{}, 1),
 		logger:      lol.NewZerolog(),
 	}
 
